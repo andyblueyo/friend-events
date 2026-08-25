@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   eventswithfriends design tokens — see SPEC.md "Visual design system".
+   Deliberately blocky: sharp corners, thick ink-navy borders, primary colours.
+   --------------------------------------------------------------------------- */
+@theme {
+  --color-cobalt: #2f5fff;
+  --color-sunflower: #ffc839;
+  --color-poppy: #ff4b3e;
+  --color-paper: #fdfbf6;
+  --color-ink: #14213d;
+  --color-grid: #dfe3ec;
+
+  --font-display: var(--font-pixelify), system-ui, sans-serif;
+  --font-sans: var(--font-work-sans), system-ui, sans-serif;
+  --font-mono: var(--font-space-mono), ui-monospace, monospace;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    /* Faint 16px graph-paper grid over warm paper. */
+    background-image:
+      linear-gradient(to right, var(--color-grid) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--color-grid) 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
+
+  /* No rounded anything unless a component opts in. */
+  * {
+    border-radius: 0;
+  }
+
+  ::selection {
+    background-color: var(--color-sunflower);
+    color: var(--color-ink);
+  }
+}
+
+@utility border-ink {
+  border: 2.5px solid var(--color-ink);
+}
