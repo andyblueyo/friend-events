@@ -49,7 +49,10 @@ export function EditFlow({ event }: { event: EventRow }) {
 
   // Controlled on purpose: React resets uncontrolled fields once a form action
   // resolves, which would wipe the user's edits when saving fails.
-  const [title, setTitle] = useState(event.title);
+  // title is only ever null on a fork row, and this page is unreachable for
+  // forks (event-card.tsx doesn't render an edit link for one) — the
+  // fallback here is just satisfying the type, not a real case.
+  const [title, setTitle] = useState(event.title ?? "");
   const [datetime, setDatetime] = useState(
     toLocalInputValue(event.event_datetime),
   );

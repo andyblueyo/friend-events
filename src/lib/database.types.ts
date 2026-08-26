@@ -31,7 +31,10 @@ export type RsvpType = "registration" | "drop_in";
 export type EventRow = {
   id: string;
   posted_by: string;
-  title: string;
+  // Nullable now: a fork stores no title/date/location/image of its own —
+  // those resolve through root_event_id at read time. Only ever null when
+  // forked_from_event_id is set.
+  title: string | null;
   event_datetime: string | null;
   end_datetime: string | null;
   location: string | null;
@@ -41,6 +44,9 @@ export type EventRow = {
   image_url: string | null;
   source_url: string;
   created_at: string;
+  forked_from_event_id: string | null;
+  root_event_id: string;
+  deleted_at: string | null;
 }
 
 export type EventInterestRow = {
@@ -99,6 +105,7 @@ export type FeedEventRow = {
   is_mine: boolean;
   is_interested: boolean;
   interest_count: number;
+  is_fork: boolean;
 };
 
 export type Database = {
@@ -122,11 +129,22 @@ export type Database = {
       };
       events: {
         Row: EventRow;
-        Insert: Omit<EventRow, "id" | "created_at"> & {
+        // root_event_id is set by the events_set_root trigger — never
+        // supplied by the app. forked_from_event_id and deleted_at default
+        // to null; forking goes through the fork_event() RPC below, not a
+        // direct insert, so most callers still never touch it.
+        Insert: Omit<
+          EventRow,
+          "id" | "created_at" | "root_event_id" | "forked_from_event_id" | "deleted_at"
+        > & {
           id?: string;
           created_at?: string;
+          forked_from_event_id?: string | null;
+          deleted_at?: string | null;
         };
-        Update: Partial<Omit<EventRow, "id" | "posted_by" | "created_at">>;
+        Update: Partial<
+          Omit<EventRow, "id" | "posted_by" | "created_at" | "root_event_id">
+        >;
         Relationships: [];
       };
       event_interest: {
@@ -164,6 +182,14 @@ export type Database = {
       list_feed_events: {
         Args: Record<string, never>;
         Returns: FeedEventRow[];
+      };
+      fork_event: {
+        Args: { p_event_id: string };
+        Returns: string;
+      };
+      delete_event: {
+        Args: { p_event_id: string };
+        Returns: undefined;
       };
     };
     Enums: {

@@ -12,10 +12,15 @@ export type DeleteState = {
 };
 
 /**
- * Deletes an event. The RLS delete policy on events already restricts this
- * to the poster (posted_by = auth.uid()), and the extra .eq() below scopes
- * the same thing explicitly so a missing row and a not-yours row both come
- * back as "not found" rather than a silent no-op.
+ * Deletes an event via the delete_event() RPC rather than a raw table
+ * delete, because which kind of delete happens depends on server-side state
+ * the client shouldn't be trusted to branch on:
+ *   - a fork always hard-deletes
+ *   - a root with no forks hard-deletes
+ *   - a root with forks soft-deletes, so the forks keep resolving their
+ *     content exactly as before
+ * The RPC also re-checks posted_by = auth.uid() itself, so a missing row and
+ * a not-yours row both surface the same way here.
  */
 export async function deleteEvent(
   _prev: DeleteState,
@@ -28,27 +33,50 @@ export async function deleteEvent(
   if (!eventId) return { status: "error", message: "Missing event." };
 
   const supabase = await createClient();
-  const { error, count } = await supabase
-    .from("events")
-    .delete({ count: "exact" })
-    .eq("id", eventId)
-    .eq("posted_by", profile.id);
+  const { error } = await supabase.rpc("delete_event", { p_event_id: eventId });
 
   if (error) {
     return { status: "error", message: `Couldn't delete that: ${error.message}` };
-  }
-
-  if (!count) {
-    return {
-      status: "error",
-      message: "Couldn't find that event — it may already be gone.",
-    };
   }
 
   revalidatePath("/");
   // Redirect callers on the /edit page back to the feed; callers on the feed
   // itself (already at "/") just see the revalidated list.
   redirect("/");
+}
+
+export type ForkState = {
+  status: "idle" | "error";
+  message?: string;
+};
+
+/**
+ * Forks an event into a new post owned by the caller. fork_event() copies
+ * only source_url onto the new row — title/date/location/image are left
+ * null and resolve through root_event_id at read time (see
+ * list_feed_events()), so an edit to the original stays visible on the fork
+ * for as long as the original exists, and survives unchanged if it's later
+ * deleted.
+ */
+export async function forkEvent(
+  _prev: ForkState,
+  formData: FormData,
+): Promise<ForkState> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { status: "error", message: "Sign in first." };
+
+  const eventId = String(formData.get("event_id") ?? "").trim();
+  if (!eventId) return { status: "error", message: "Missing event." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fork_event", { p_event_id: eventId });
+
+  if (error) {
+    return { status: "error", message: `Couldn't share that: ${error.message}` };
+  }
+
+  revalidatePath("/");
+  return { status: "idle" };
 }
 
 export type InterestState = {

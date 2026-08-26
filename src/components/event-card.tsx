@@ -7,14 +7,17 @@ import { useFormStatus } from "react-dom";
 import { AvatarChip, Button } from "@/components/ui";
 import {
   deleteEvent,
+  forkEvent,
   toggleEventInterest,
   type DeleteState,
+  type ForkState,
   type InterestState,
 } from "@/app/feed-actions";
 import type { FeedEventRow } from "@/lib/database.types";
 
 const INITIAL: InterestState = { status: "idle" };
 const DELETE_INITIAL: DeleteState = { status: "idle" };
+const FORK_INITIAL: ForkState = { status: "idle" };
 
 /**
  * Dates render with the *browser's* timezone, which won't match the server's
@@ -148,7 +151,9 @@ export function EventCard({
       <div className="border-ink bg-paper shadow-[6px_6px_0_0_var(--color-ink)]">
         <header className="bg-cobalt flex items-center justify-between gap-2 border-b-[2.5px] border-ink px-3 py-1.5">
           <h2 className="truncate font-display text-base leading-none text-white">
-            {event.poster_display_name} is going
+            {event.is_fork
+              ? `reshared by ${event.poster_display_name}`
+              : `${event.poster_display_name} is going`}
           </h2>
           <span
             aria-hidden
@@ -252,7 +257,11 @@ export function EventCard({
             </a>
           </div>
 
-          {event.is_mine ? <OwnerControls eventId={event.id} /> : null}
+          {!event.is_mine ? <ForkButton eventId={event.id} /> : null}
+
+          {event.is_mine ? (
+            <OwnerControls eventId={event.id} isFork={Boolean(event.is_fork)} />
+          ) : null}
         </div>
       </div>
     </article>
@@ -265,7 +274,13 @@ export function EventCard({
  * flips this row into an inline "are you sure?" confirmation rather than
  * deleting on the first click.
  */
-function OwnerControls({ eventId }: { eventId: string }) {
+function OwnerControls({
+  eventId,
+  isFork,
+}: {
+  eventId: string;
+  isFork: boolean;
+}) {
   const [confirming, setConfirming] = useState(false);
   const [state, action] = useActionState(deleteEvent, DELETE_INITIAL);
 
@@ -296,12 +311,14 @@ function OwnerControls({ eventId }: { eventId: string }) {
 
   return (
     <div className="flex items-center gap-3 border-t-[1.5px] border-ink/10 pt-2">
-      <Link
-        href={`/edit/${eventId}`}
-        className="font-display text-xs text-ink/60 underline underline-offset-2"
-      >
-        edit
-      </Link>
+      {isFork ? null : (
+        <Link
+          href={`/edit/${eventId}`}
+          className="font-display text-xs text-ink/60 underline underline-offset-2"
+        >
+          edit
+        </Link>
+      )}
       <button
         type="button"
         onClick={() => setConfirming(true)}
@@ -310,6 +327,42 @@ function OwnerControls({ eventId }: { eventId: string }) {
         delete
       </button>
     </div>
+  );
+}
+
+/**
+ * Single-tap reshare — no confirm step, no edit screen, since a fork copies
+ * nothing editable of its own. Stays available on someone else's fork too
+ * (re-forking is allowed), just not on your own posts.
+ */
+function ForkButton({ eventId }: { eventId: string }) {
+  const [state, action] = useActionState(forkEvent, FORK_INITIAL);
+
+  return (
+    <div className="border-t-[1.5px] border-ink/10 pt-2">
+      <form action={action}>
+        <input type="hidden" name="event_id" value={eventId} />
+        <ForkSubmitButton />
+      </form>
+      {state.status === "error" ? (
+        <p className="mt-1 font-mono text-xs text-poppy">{state.message}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function ForkSubmitButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button
+      type="submit"
+      variant="plain"
+      disabled={pending}
+      className="px-3 py-1.5 text-sm"
+    >
+      {pending ? "sharing…" : "share to my friends"}
+    </Button>
   );
 }
 
