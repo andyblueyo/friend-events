@@ -25,11 +25,13 @@ export function SiteHeader({ profile }: { profile: UserRow }) {
           >
             friends
           </Link>
-          <AvatarChip
-            name={profile.display_name}
-            src={profile.avatar_url}
-            size={28}
-          />
+          <Link href="/profile" aria-label="your profile">
+            <AvatarChip
+              name={profile.display_name}
+              src={profile.avatar_url}
+              size={28}
+            />
+          </Link>
           <form action={signOut}>
             <Button variant="plain" className="px-2 py-1 text-sm">
               out

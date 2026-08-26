@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { SiteHeader } from "@/components/site-header";
 import { Window } from "@/components/window";
 import { AvatarChip } from "@/components/ui";
@@ -100,21 +102,24 @@ function PersonLine({
 }) {
   return (
     <li className="border-ink flex items-center justify-between gap-3 bg-white px-3 py-2">
-      <div className="flex min-w-0 items-center gap-3">
+      <Link
+        href={`/profile/${row.other_handle}`}
+        className="flex min-w-0 items-center gap-3"
+      >
         <AvatarChip
           name={row.other_display_name}
           src={row.other_avatar_url}
           size={32}
         />
         <div className="min-w-0">
-          <p className="truncate font-sans text-sm text-ink">
+          <p className="truncate font-sans text-sm text-ink hover:underline">
             {row.other_display_name}
           </p>
           <p className="truncate font-mono text-xs text-ink/60">
             @{row.other_handle}
           </p>
         </div>
-      </div>
+      </Link>
       {children}
     </li>
   );

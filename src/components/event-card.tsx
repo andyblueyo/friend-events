@@ -159,16 +159,19 @@ export function EventCard({
         </header>
 
         <div className="space-y-3 p-4">
-          <div className="flex items-center gap-2">
+          <Link
+            href={`/profile/${event.poster_handle}`}
+            className="flex items-center gap-2"
+          >
             <AvatarChip
               name={event.poster_display_name}
               src={event.poster_avatar_url}
               size={28}
             />
-            <span className="truncate font-mono text-xs text-ink/60">
+            <span className="truncate font-mono text-xs text-ink/60 hover:underline">
               @{event.poster_handle}
             </span>
-          </div>
+          </Link>
 
           <h3 className="font-display text-lg leading-tight text-ink">
             {event.title}
