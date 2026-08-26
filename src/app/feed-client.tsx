@@ -92,6 +92,21 @@ export function FeedClient({ events }: { events: FeedEventRow[] }) {
     });
   }, [events, filter, sort, overrides]);
 
+  // Hide events whose start time has already passed — but only from the
+  // list view. The calendar is a historical record too, so past events stay
+  // visible there.
+  const listVisible = useMemo(
+    () =>
+      visible.filter(
+        (event) =>
+          !event.event_datetime ||
+          new Date(event.event_datetime).getTime() >= new Date().getTime(),
+      ),
+    [visible],
+  );
+
+  const rows = view === "list" ? listVisible : visible;
+
   const renderCards = (rows: FeedEventRow[]) => (
     <div className="space-y-6">
       {rows.map((event) => (
@@ -144,19 +159,21 @@ export function FeedClient({ events }: { events: FeedEventRow[] }) {
         </div>
       </Window>
 
-      {visible.length === 0 ? (
+      {rows.length === 0 ? (
         <Window title="nothing here">
           <p className="font-sans text-sm text-ink/80">
             {filter === "interested"
               ? "You haven't marked interest in anything yet."
-              : "No events yet. Post one, or add friends and wait for theirs."}
+              : view === "list"
+                ? "No upcoming events. Post one, or add friends and wait for theirs."
+                : "No events yet. Post one, or add friends and wait for theirs."}
           </p>
         </Window>
       ) : view === "list" ? (
-        renderCards(visible)
+        renderCards(rows)
       ) : (
         <Window title="calendar">
-          <CalendarGrid events={visible} renderDay={renderCards} />
+          <CalendarGrid events={rows} renderDay={renderCards} />
         </Window>
       )}
     </div>
