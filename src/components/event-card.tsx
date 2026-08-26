@@ -1,13 +1,20 @@
 "use client";
 
-import { useActionState, type ReactNode } from "react";
+import Link from "next/link";
+import { useActionState, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 
 import { AvatarChip, Button } from "@/components/ui";
-import { toggleEventInterest, type InterestState } from "@/app/feed-actions";
+import {
+  deleteEvent,
+  toggleEventInterest,
+  type DeleteState,
+  type InterestState,
+} from "@/app/feed-actions";
 import type { FeedEventRow } from "@/lib/database.types";
 
 const INITIAL: InterestState = { status: "idle" };
+const DELETE_INITIAL: DeleteState = { status: "idle" };
 
 /**
  * Dates render with the *browser's* timezone, which won't match the server's
@@ -241,9 +248,79 @@ export function EventCard({
               open link ↗
             </a>
           </div>
+
+          {event.is_mine ? <OwnerControls eventId={event.id} /> : null}
         </div>
       </div>
     </article>
+  );
+}
+
+/**
+ * Edit link + delete, shown only on the poster's own cards (event.is_mine —
+ * driven by the RLS policies, which are the real enforcement here). Delete
+ * flips this row into an inline "are you sure?" confirmation rather than
+ * deleting on the first click.
+ */
+function OwnerControls({ eventId }: { eventId: string }) {
+  const [confirming, setConfirming] = useState(false);
+  const [state, action] = useActionState(deleteEvent, DELETE_INITIAL);
+
+  if (confirming) {
+    return (
+      <div className="border-poppy space-y-2 border-[1.5px] border-dashed bg-poppy/10 p-3">
+        <p className="font-display text-sm text-poppy">
+          delete this event? this can&apos;t be undone.
+        </p>
+        <form action={action} className="flex flex-wrap items-center gap-3">
+          <input type="hidden" name="event_id" value={eventId} />
+          <ConfirmDeleteButton />
+          <Button
+            type="button"
+            variant="plain"
+            className="px-3 py-1.5 text-sm"
+            onClick={() => setConfirming(false)}
+          >
+            cancel
+          </Button>
+        </form>
+        {state.status === "error" ? (
+          <p className="font-mono text-xs text-poppy">{state.message}</p>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3 border-t-[1.5px] border-ink/10 pt-2">
+      <Link
+        href={`/edit/${eventId}`}
+        className="font-display text-xs text-ink/60 underline underline-offset-2"
+      >
+        edit
+      </Link>
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        className="font-display text-xs text-poppy underline underline-offset-2"
+      >
+        delete
+      </button>
+    </div>
+  );
+}
+
+function ConfirmDeleteButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button
+      type="submit"
+      disabled={pending}
+      className="bg-poppy border-ink px-3 py-1.5 text-sm text-white"
+    >
+      {pending ? "deleting…" : "yes, delete"}
+    </Button>
   );
 }
 

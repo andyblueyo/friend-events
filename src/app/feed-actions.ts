@@ -1,9 +1,55 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+
+export type DeleteState = {
+  status: "idle" | "error";
+  message?: string;
+};
+
+/**
+ * Deletes an event. The RLS delete policy on events already restricts this
+ * to the poster (posted_by = auth.uid()), and the extra .eq() below scopes
+ * the same thing explicitly so a missing row and a not-yours row both come
+ * back as "not found" rather than a silent no-op.
+ */
+export async function deleteEvent(
+  _prev: DeleteState,
+  formData: FormData,
+): Promise<DeleteState> {
+  const profile = await getCurrentProfile();
+  if (!profile) return { status: "error", message: "Sign in first." };
+
+  const eventId = String(formData.get("event_id") ?? "").trim();
+  if (!eventId) return { status: "error", message: "Missing event." };
+
+  const supabase = await createClient();
+  const { error, count } = await supabase
+    .from("events")
+    .delete({ count: "exact" })
+    .eq("id", eventId)
+    .eq("posted_by", profile.id);
+
+  if (error) {
+    return { status: "error", message: `Couldn't delete that: ${error.message}` };
+  }
+
+  if (!count) {
+    return {
+      status: "error",
+      message: "Couldn't find that event — it may already be gone.",
+    };
+  }
+
+  revalidatePath("/");
+  // Redirect callers on the /edit page back to the feed; callers on the feed
+  // itself (already at "/") just see the revalidated list.
+  redirect("/");
+}
 
 export type InterestState = {
   status: "idle" | "error";
