@@ -25,12 +25,19 @@ export type FriendshipRow = {
   created_at: string;
 }
 
+export type PriceType = "free" | "paid";
+export type RsvpType = "registration" | "drop_in";
+
 export type EventRow = {
   id: string;
   posted_by: string;
   title: string;
   event_datetime: string | null;
+  end_datetime: string | null;
   location: string | null;
+  notes: string | null;
+  price_type: PriceType | null;
+  rsvp_type: RsvpType | null;
   image_url: string | null;
   source_url: string;
   created_at: string;
@@ -77,7 +84,11 @@ export type FeedEventRow = {
   id: string;
   title: string;
   event_datetime: string | null;
+  end_datetime: string | null;
   location: string | null;
+  notes: string | null;
+  price_type: PriceType | null;
+  rsvp_type: RsvpType | null;
   image_url: string | null;
   source_url: string;
   created_at: string;

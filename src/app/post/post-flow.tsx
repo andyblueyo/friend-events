@@ -3,14 +3,28 @@
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { Button, Field, ProgressBar } from "@/components/ui";
+import { Button, Field, ProgressBar, Textarea, ToggleGroup } from "@/components/ui";
+import type { PriceType, RsvpType } from "@/lib/database.types";
 import type { ScrapeResult } from "@/lib/scrape-event";
 import {
   postEvent,
   scrapeLink,
+  type PostFieldErrors,
   type PostState,
   type ScrapeState,
 } from "./actions";
+
+const NOTES_MAX_LENGTH = 150;
+
+const PRICE_OPTIONS: { value: PriceType; label: string }[] = [
+  { value: "free", label: "free" },
+  { value: "paid", label: "paid" },
+];
+
+const RSVP_OPTIONS: { value: RsvpType; label: string }[] = [
+  { value: "registration", label: "registration" },
+  { value: "drop_in", label: "drop-in" },
+];
 
 const SCRAPE_INITIAL: ScrapeState = { status: "idle" };
 const POST_INITIAL: PostState = { status: "idle" };
@@ -106,10 +120,40 @@ function ConfirmForm({
   const [datetime, setDatetime] = useState(
     toLocalInputValue(result.event_datetime),
   );
+  const [endDatetime, setEndDatetime] = useState("");
   const [location, setLocation] = useState(result.location ?? "");
+  const [notes, setNotes] = useState("");
+  const [priceType, setPriceType] = useState<PriceType | null>(null);
+  const [rsvpType, setRsvpType] = useState<RsvpType | null>(null);
   const [imageUrl, setImageUrl] = useState(result.image_url ?? "");
   const [sourceUrl, setSourceUrl] = useState(result.source_url);
   const [imageBroken, setImageBroken] = useState(false);
+
+  // A field only turns red once the person has left it, not on first paint —
+  // otherwise a freshly-opened form (title blank, nothing scraped) would look
+  // broken before anyone's typed anything.
+  const [touched, setTouched] = useState<Partial<Record<string, boolean>>>({});
+  const markTouched = (field: string) =>
+    setTouched((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
+
+  // Client-side checks mirror the server's required-field rules exactly, so
+  // the button disables/enables in step with what the server would accept.
+  const clientErrors: PostFieldErrors = {
+    title: title.trim() ? undefined : "Give it a title.",
+    event_datetime: datetime ? undefined : "Add a date & time.",
+    location: location.trim() ? undefined : "Add a location.",
+    source_url: sourceUrl.trim()
+      ? undefined
+      : "Add the link friends will register at.",
+  };
+
+  const canSubmit = Object.values(clientErrors).every((message) => !message);
+
+  // Server errors (from an actual submit attempt) always win over the local
+  // touched/client-error guess, since they reflect what really happened.
+  const errorFor = (field: keyof PostFieldErrors) =>
+    state.fieldErrors?.[field] ??
+    (touched[field] ? clientErrors[field] : undefined);
 
   return (
     <form action={action} className="space-y-4">
@@ -131,15 +175,19 @@ function ConfirmForm({
         required
         value={title}
         onChange={(event) => setTitle(event.target.value)}
+        onBlur={() => markTouched("title")}
+        error={errorFor("title")}
       />
 
       <Field
         label="date & time"
         type="datetime-local"
         className="font-mono"
+        required
         value={datetime}
         onChange={(event) => setDatetime(event.target.value)}
-        hint="Leave empty if you're not sure."
+        onBlur={() => markTouched("event_datetime")}
+        error={errorFor("event_datetime")}
       />
       {/* The action reads this, not the visible field — see localInputToIso. */}
       <input
@@ -149,13 +197,61 @@ function ConfirmForm({
       />
 
       <Field
+        label="end time"
+        type="datetime-local"
+        className="font-mono"
+        value={endDatetime}
+        onChange={(event) => setEndDatetime(event.target.value)}
+        onBlur={() => markTouched("end_datetime")}
+        error={state.fieldErrors?.end_datetime}
+        hint="Optional."
+      />
+      <input
+        type="hidden"
+        name="end_datetime"
+        value={localInputToIso(endDatetime)}
+      />
+
+      <Field
         label="location"
         name="location"
         className="font-mono"
+        required
         value={location}
         onChange={(event) => setLocation(event.target.value)}
+        onBlur={() => markTouched("location")}
+        error={errorFor("location")}
         placeholder="where is it?"
       />
+
+      <Textarea
+        label="notes"
+        name="notes"
+        rows={2}
+        maxLength={NOTES_MAX_LENGTH}
+        value={notes}
+        onChange={(event) => setNotes(event.target.value)}
+        error={state.fieldErrors?.notes}
+        placeholder="anything friends should know?"
+        hint="Optional."
+      />
+
+      <div className="flex flex-wrap gap-6">
+        <ToggleGroup
+          label="cost"
+          options={PRICE_OPTIONS}
+          value={priceType}
+          onChange={setPriceType}
+        />
+        <ToggleGroup
+          label="rsvp"
+          options={RSVP_OPTIONS}
+          value={rsvpType}
+          onChange={setRsvpType}
+        />
+      </div>
+      <input type="hidden" name="price_type" value={priceType ?? ""} />
+      <input type="hidden" name="rsvp_type" value={rsvpType ?? ""} />
 
       <Field
         label="image link"
@@ -166,6 +262,7 @@ function ConfirmForm({
           setImageUrl(event.target.value);
           setImageBroken(false);
         }}
+        error={state.fieldErrors?.image_url}
         placeholder="https://…"
       />
 
@@ -195,10 +292,12 @@ function ConfirmForm({
         required
         value={sourceUrl}
         onChange={(event) => setSourceUrl(event.target.value)}
+        onBlur={() => markTouched("source_url")}
+        error={errorFor("source_url")}
         hint="Where friends go to actually register."
       />
 
-      <ConfirmActions onRestart={onRestart} />
+      <ConfirmActions onRestart={onRestart} canSubmit={canSubmit} />
 
       {state.status === "error" ? (
         <p className="font-mono text-xs text-poppy">{state.message}</p>
@@ -207,12 +306,18 @@ function ConfirmForm({
   );
 }
 
-function ConfirmActions({ onRestart }: { onRestart: () => void }) {
+function ConfirmActions({
+  onRestart,
+  canSubmit,
+}: {
+  onRestart: () => void;
+  canSubmit: boolean;
+}) {
   const { pending } = useFormStatus();
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <Button type="submit" disabled={pending}>
+      <Button type="submit" disabled={pending || !canSubmit}>
         {pending ? "posting…" : "post to your feed"}
       </Button>
       <Button

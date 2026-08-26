@@ -1,4 +1,8 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes } from "react";
+import type {
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  TextareaHTMLAttributes,
+} from "react";
 
 const BUTTON_BASE =
   "font-display border-ink inline-flex items-center justify-center px-4 py-2 text-base leading-none " +
@@ -25,20 +29,143 @@ export function Button({
 export function Field({
   label,
   hint,
+  error,
+  required,
   className = "",
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string }) {
+}: InputHTMLAttributes<HTMLInputElement> & {
+  label: string;
+  hint?: string;
+  error?: string;
+}) {
   return (
     <label className="block">
-      <span className="font-display mb-1 block text-sm text-ink">{label}</span>
+      <span className="font-display mb-1 block text-sm text-ink">
+        {label}
+        {required ? (
+          <span aria-hidden className="text-poppy">
+            {" "}
+            *
+          </span>
+        ) : null}
+      </span>
       <input
-        className={`border-ink bg-white w-full px-3 py-2 font-sans text-ink outline-none focus:shadow-[3px_3px_0_0_var(--color-cobalt)] ${className}`}
+        required={required}
+        aria-invalid={error ? true : undefined}
+        className={`bg-white w-full px-3 py-2 font-sans text-ink outline-none ${
+          error
+            ? "border-poppy-error focus:shadow-[3px_3px_0_0_var(--color-poppy)]"
+            : "border-ink focus:shadow-[3px_3px_0_0_var(--color-cobalt)]"
+        } ${className}`}
         {...props}
       />
-      {hint ? (
+      {error ? (
+        <span className="mt-1 block font-mono text-xs text-poppy">{error}</span>
+      ) : hint ? (
         <span className="mt-1 block font-mono text-xs text-ink/60">{hint}</span>
       ) : null}
     </label>
+  );
+}
+
+/** Same frame as Field, but a multi-line textarea with an optional live counter. */
+export function Textarea({
+  label,
+  hint,
+  error,
+  required,
+  className = "",
+  maxLength,
+  value,
+  ...props
+}: TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  label: string;
+  hint?: string;
+  error?: string;
+}) {
+  const length = typeof value === "string" ? value.length : 0;
+
+  return (
+    <label className="block">
+      <span className="mb-1 flex items-baseline justify-between gap-2">
+        <span className="font-display text-sm text-ink">
+          {label}
+          {required ? (
+            <span aria-hidden className="text-poppy">
+              {" "}
+              *
+            </span>
+          ) : null}
+        </span>
+        {maxLength ? (
+          <span className="font-mono text-xs text-ink/50">
+            {length}/{maxLength}
+          </span>
+        ) : null}
+      </span>
+      <textarea
+        required={required}
+        aria-invalid={error ? true : undefined}
+        className={`bg-white w-full resize-none px-3 py-2 font-sans text-ink outline-none ${
+          error
+            ? "border-poppy-error focus:shadow-[3px_3px_0_0_var(--color-poppy)]"
+            : "border-ink focus:shadow-[3px_3px_0_0_var(--color-cobalt)]"
+        } ${className}`}
+        maxLength={maxLength}
+        value={value}
+        {...props}
+      />
+      {error ? (
+        <span className="mt-1 block font-mono text-xs text-poppy">{error}</span>
+      ) : hint ? (
+        <span className="mt-1 block font-mono text-xs text-ink/60">{hint}</span>
+      ) : null}
+    </label>
+  );
+}
+
+/**
+ * A labeled row of mutually-exclusive buttons that can also be fully unset.
+ * Clicking the already-selected option clears it back to null — there's no
+ * separate "clear" control, and no option is pre-selected by default.
+ */
+export function ToggleGroup<Value extends string>({
+  label,
+  hint,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  options: { value: Value; label: string }[];
+  value: Value | null;
+  onChange: (value: Value | null) => void;
+}) {
+  return (
+    <div>
+      <span className="font-display mb-1 block text-sm text-ink">{label}</span>
+      <div className="flex flex-wrap gap-2" role="group" aria-label={label}>
+        {options.map((option) => {
+          const selected = value === option.value;
+          return (
+            <Button
+              key={option.value}
+              type="button"
+              variant={selected ? "primary" : "plain"}
+              aria-pressed={selected}
+              className="px-3 py-1.5 text-sm"
+              onClick={() => onChange(selected ? null : option.value)}
+            >
+              {option.label}
+            </Button>
+          );
+        })}
+      </div>
+      {hint ? (
+        <span className="mt-1 block font-mono text-xs text-ink/60">{hint}</span>
+      ) : null}
+    </div>
   );
 }
 

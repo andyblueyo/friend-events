@@ -30,6 +30,10 @@ const EXPECTED = {
     { table: "users", column: "handle", migration: "0003" },
     { table: "events", column: "source_url", migration: "0001" },
     { table: "friendships", column: "requested_by", migration: "0001" },
+    { table: "events", column: "end_datetime", migration: "0006" },
+    { table: "events", column: "notes", migration: "0006" },
+    { table: "events", column: "price_type", migration: "0006" },
+    { table: "events", column: "rsvp_type", migration: "0006" },
   ],
   functions: [
     { name: "friendship_pair", body: { one: ZERO_UUID(), two: ZERO_UUID() }, migration: "0001" },

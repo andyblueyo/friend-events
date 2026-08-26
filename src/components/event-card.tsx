@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 
 import { AvatarChip, Button } from "@/components/ui";
@@ -27,6 +27,49 @@ export function formatEventDate(iso: string | null): string {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+/** Just the clock time, for pairing with formatEventDate on an end time that
+ * shares the same day as the start. */
+function formatTimeOnly(date: Date): string {
+  return date.toLocaleString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+/** "Sat Aug 30, 2:30 PM" → paired with an end time as either "– 4:00 PM"
+ * (same day) or a full second date (different day). Returns null when
+ * there's nothing to add. */
+export function formatEventEndSuffix(
+  startIso: string | null,
+  endIso: string | null,
+): string | null {
+  if (!endIso) return null;
+
+  const end = new Date(endIso);
+  if (Number.isNaN(end.getTime())) return null;
+
+  const start = startIso ? new Date(startIso) : null;
+  const sameDay =
+    start &&
+    !Number.isNaN(start.getTime()) &&
+    start.toDateString() === end.toDateString();
+
+  return sameDay ? `– ${formatTimeOnly(end)}` : `– ${formatEventDate(endIso)}`;
+}
+
+const PRICE_LABEL: Record<string, string> = { free: "free", paid: "paid" };
+const RSVP_LABEL: Record<string, string> = {
+  registration: "registration",
+  drop_in: "drop-in",
+};
+
+/** Small bordered label for the optional price/rsvp facts — quieter than the
+ * "open to company" stamp, since these are just metadata, not the hook. */
+function Tag({ children }: { children: ReactNode }) {
+  return (
+    <span className="border-ink bg-white px-1.5 py-0.5 font-mono text-[10px] leading-none text-ink/70">
+      {children}
+    </span>
+  );
 }
 
 export function EventCard({
@@ -79,11 +122,23 @@ export function EventCard({
             {event.title}
           </h3>
 
+          {event.price_type || event.rsvp_type ? (
+            <div className="flex flex-wrap gap-1.5">
+              {event.price_type ? (
+                <Tag>{PRICE_LABEL[event.price_type]}</Tag>
+              ) : null}
+              {event.rsvp_type ? <Tag>{RSVP_LABEL[event.rsvp_type]}</Tag> : null}
+            </div>
+          ) : null}
+
           <dl className="space-y-1 font-mono text-xs text-ink/80">
             <div className="flex gap-2">
               <dt className="text-ink/50">when</dt>
               <dd suppressHydrationWarning>
                 {formatEventDate(event.event_datetime)}
+                {formatEventEndSuffix(event.event_datetime, event.end_datetime)
+                  ? ` ${formatEventEndSuffix(event.event_datetime, event.end_datetime)}`
+                  : ""}
               </dd>
             </div>
             <div className="flex gap-2">
@@ -91,6 +146,12 @@ export function EventCard({
               <dd>{event.location ?? "location TBD"}</dd>
             </div>
           </dl>
+
+          {event.notes ? (
+            <p className="font-mono text-xs text-ink/70 italic">
+              &ldquo;{event.notes}&rdquo;
+            </p>
+          ) : null}
 
           {event.image_url && !compact ? (
             <div className="border-ink bg-white p-1">
