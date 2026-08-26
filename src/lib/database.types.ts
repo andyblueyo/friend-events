@@ -106,6 +106,7 @@ export type FeedEventRow = {
   is_interested: boolean;
   interest_count: number;
   is_fork: boolean;
+  already_forked_by_me: boolean;
 };
 
 export type Database = {

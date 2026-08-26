@@ -48,15 +48,20 @@ export async function deleteEvent(
 export type ForkState = {
   status: "idle" | "error";
   message?: string;
+  /** What the row looks like after the action; drives the button label. */
+  shared?: boolean;
 };
 
 /**
- * Forks an event into a new post owned by the caller. fork_event() copies
- * only source_url onto the new row — title/date/location/image are left
- * null and resolve through root_event_id at read time (see
- * list_feed_events()), so an edit to the original stays visible on the fork
- * for as long as the original exists, and survives unchanged if it's later
- * deleted.
+ * Toggles a fork the same way toggleEventInterest toggles interest: read the
+ * current state server-side, then insert or delete accordingly, rather than
+ * trusting an intent flag from the client. Un-sharing deletes the fork row
+ * via delete_event() (always a hard delete for a fork — see 0007) rather
+ * than a raw table delete, for the same posted_by-ownership guarantee used
+ * everywhere else deletion happens.
+ *
+ * events_one_fork_per_user (0008) backs this up at the database level, so a
+ * double-click race still can't produce two forks of the same event.
  */
 export async function forkEvent(
   _prev: ForkState,
@@ -69,14 +74,45 @@ export async function forkEvent(
   if (!eventId) return { status: "error", message: "Missing event." };
 
   const supabase = await createClient();
+
+  const { data: existing, error: readError } = await supabase
+    .from("events")
+    .select("id")
+    .eq("forked_from_event_id", eventId)
+    .eq("posted_by", profile.id)
+    .maybeSingle();
+
+  if (readError) {
+    return { status: "error", message: `Couldn't check that: ${readError.message}` };
+  }
+
+  if (existing) {
+    const { error } = await supabase.rpc("delete_event", {
+      p_event_id: existing.id,
+    });
+
+    if (error) {
+      return { status: "error", message: `Couldn't un-share that: ${error.message}` };
+    }
+
+    revalidatePath("/");
+    return { status: "idle", shared: false };
+  }
+
   const { error } = await supabase.rpc("fork_event", { p_event_id: eventId });
 
   if (error) {
+    // Another tab/request won the race and already forked it — the end
+    // state is what the user wanted, so report success rather than error.
+    if (error.code === "23505") {
+      revalidatePath("/");
+      return { status: "idle", shared: true };
+    }
     return { status: "error", message: `Couldn't share that: ${error.message}` };
   }
 
   revalidatePath("/");
-  return { status: "idle" };
+  return { status: "idle", shared: true };
 }
 
 export type InterestState = {

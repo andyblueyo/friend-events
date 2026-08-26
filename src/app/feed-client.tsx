@@ -54,9 +54,16 @@ export function FeedClient({ events }: { events: FeedEventRow[] }) {
   // Interest changes revalidate the page, but keeping a local override makes
   // the button flip immediately instead of waiting for the round trip.
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
+  // Same idea, for the fork toggle.
+  const [forkOverrides, setForkOverrides] = useState<Record<string, boolean>>(
+    {},
+  );
 
   const isInterested = (event: FeedEventRow) =>
     overrides[event.id] ?? event.is_interested;
+
+  const isShared = (event: FeedEventRow) =>
+    forkOverrides[event.id] ?? event.already_forked_by_me;
 
   const visible = useMemo(() => {
     const filtered =
@@ -116,6 +123,10 @@ export function FeedClient({ events }: { events: FeedEventRow[] }) {
           interested={isInterested(event)}
           onToggled={(next) =>
             setOverrides((current) => ({ ...current, [event.id]: next }))
+          }
+          shared={isShared(event)}
+          onForkToggled={(next) =>
+            setForkOverrides((current) => ({ ...current, [event.id]: next }))
           }
         />
       ))}

@@ -123,11 +123,15 @@ export function EventCard({
   event,
   interested,
   onToggled,
+  shared,
+  onForkToggled,
   compact = false,
 }: {
   event: FeedEventRow;
   interested: boolean;
   onToggled: (next: boolean) => void;
+  shared: boolean;
+  onForkToggled: (next: boolean) => void;
   compact?: boolean;
 }) {
   const urgency = getUrgencyBadge(event.event_datetime, event.end_datetime);
@@ -257,7 +261,13 @@ export function EventCard({
             </a>
           </div>
 
-          {!event.is_mine ? <ForkButton eventId={event.id} /> : null}
+          {!event.is_mine ? (
+            <ForkButton
+              eventId={event.id}
+              shared={shared}
+              onToggled={onForkToggled}
+            />
+          ) : null}
 
           {event.is_mine ? (
             <OwnerControls eventId={event.id} isFork={Boolean(event.is_fork)} />
@@ -331,18 +341,36 @@ function OwnerControls({
 }
 
 /**
- * Single-tap reshare — no confirm step, no edit screen, since a fork copies
- * nothing editable of its own. Stays available on someone else's fork too
- * (re-forking is allowed), just not on your own posts.
+ * Toggle, same shape as InterestButton below: shows "shared" once you've
+ * forked this specific event, and clicking again un-shares it (deletes your
+ * fork). Available on someone else's fork too (re-forking is allowed), just
+ * not on your own posts.
  */
-function ForkButton({ eventId }: { eventId: string }) {
-  const [state, action] = useActionState(forkEvent, FORK_INITIAL);
+function ForkButton({
+  eventId,
+  shared,
+  onToggled,
+}: {
+  eventId: string;
+  shared: boolean;
+  onToggled: (next: boolean) => void;
+}) {
+  const [state, action] = useActionState(
+    async (prev: ForkState, formData: FormData) => {
+      const result = await forkEvent(prev, formData);
+      if (result.status === "idle" && typeof result.shared === "boolean") {
+        onToggled(result.shared);
+      }
+      return result;
+    },
+    FORK_INITIAL,
+  );
 
   return (
     <div className="border-t-[1.5px] border-ink/10 pt-2">
       <form action={action}>
         <input type="hidden" name="event_id" value={eventId} />
-        <ForkSubmitButton />
+        <ForkSubmitButton shared={shared} />
       </form>
       {state.status === "error" ? (
         <p className="mt-1 font-mono text-xs text-poppy">{state.message}</p>
@@ -351,7 +379,7 @@ function ForkButton({ eventId }: { eventId: string }) {
   );
 }
 
-function ForkSubmitButton() {
+function ForkSubmitButton({ shared }: { shared: boolean }) {
   const { pending } = useFormStatus();
 
   return (
@@ -361,7 +389,7 @@ function ForkSubmitButton() {
       disabled={pending}
       className="px-3 py-1.5 text-sm"
     >
-      {pending ? "sharing…" : "share to my friends"}
+      {pending ? "…" : shared ? "✓ shared" : "share to my friends"}
     </Button>
   );
 }
