@@ -42,6 +42,26 @@ export function Field({
   );
 }
 
+/** Indeterminate, deliberately chunky progress bar for waiting states. */
+export function ProgressBar({ label }: { label?: string }) {
+  return (
+    <div aria-live="polite">
+      <div className="border-ink h-5 w-full overflow-hidden bg-white">
+        <div
+          className="h-full w-1/3 animate-[dither-slide_1.1s_linear_infinite]"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(45deg, var(--color-cobalt) 0 4px, var(--color-ink) 4px 8px)",
+          }}
+        />
+      </div>
+      {label ? (
+        <p className="mt-1 font-mono text-xs text-ink/60">{label}</p>
+      ) : null}
+    </div>
+  );
+}
+
 /** Square avatar chip with a thick border — never a circle. */
 export function AvatarChip({
   name,

@@ -56,26 +56,51 @@ async function createProfileFor(
       : "";
   const metaAvatar =
     typeof metadata?.avatar_url === "string" ? metadata.avatar_url.trim() : "";
+  const metaHandle =
+    typeof metadata?.handle === "string" ? metadata.handle.trim() : "";
 
-  const { data, error } = await supabase
-    .from("users")
-    .insert({
-      id,
-      email: email ?? "",
-      display_name: metaName || email?.split("@")[0] || "friend",
-      avatar_url: metaAvatar || null,
-    })
-    .select()
-    .single();
+  const displayName = metaName || email?.split("@")[0] || "friend";
+  const seed = metaHandle || displayName || email?.split("@")[0] || "friend";
 
-  if (error) {
-    throw new Error(
-      `Signed in as ${id} but no profile row exists, and creating one failed: ` +
-        `${error.message}${error.code ? ` (${error.code})` : ""}`,
-    );
+  // handle is NOT NULL and UNIQUE, so a fixed candidate would make this path
+  // fail permanently for the second person who needs it. Retry with a fresh
+  // suffix on a unique violation.
+  let lastError = "";
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data, error } = await supabase
+      .from("users")
+      .insert({
+        id,
+        email: email ?? "",
+        display_name: displayName,
+        handle: handleCandidate(seed, attempt),
+        avatar_url: metaAvatar || null,
+      })
+      .select()
+      .single();
+
+    if (!error) return data;
+
+    lastError = `${error.message}${error.code ? ` (${error.code})` : ""}`;
+    if (error.code !== "23505") break; // not a uniqueness clash — no point retrying
   }
 
-  return data;
+  throw new Error(
+    `Signed in as ${id} but no profile row exists, and creating one failed: ${lastError}`,
+  );
+}
+
+/** Mirrors the users_handle_format CHECK: [a-z0-9_], 3-20 characters. */
+function handleCandidate(seed: string, attempt: number): string {
+  const base =
+    seed.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 15) || "friend";
+  const padded = base.padEnd(3, "0");
+
+  // First attempt uses the clean handle; later ones append a random suffix.
+  if (attempt === 0) return padded;
+
+  const suffix = Math.random().toString(16).slice(2, 6).padEnd(4, "0");
+  return `${padded.slice(0, 15)}_${suffix}`;
 }
 
 /**

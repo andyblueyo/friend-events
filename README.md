@@ -21,7 +21,7 @@ Next.js (App Router, TypeScript) · Supabase (Postgres + auth) · Tailwind v4 ·
    ```
 
 3. Apply the schema. Either paste the files in `supabase/migrations/` into the
-   Supabase SQL editor in order, or with the CLI:
+   Supabase SQL editor **in filename order**, or with the CLI:
 
    ```bash
    npx supabase link --project-ref <your-ref>
@@ -60,17 +60,44 @@ src/
     auth/callback/  PKCE code exchange
     page.tsx        feed (stub)
     friends/        friend requests (stub)
-    post/           paste-a-link event posting (stub)
+    post/           paste-a-link event posting (page, flow, actions)
   components/       Window chrome, buttons, avatar chips
   lib/
     supabase/       browser / server / proxy clients
     auth.ts         getCurrentProfile, requireProfile
+    safe-fetch.ts   SSRF-guarded fetcher for user-pasted URLs
+    scrape-event.ts JSON-LD → Open Graph event extraction
     database.types.ts
   proxy.ts          session refresh + route gating (Next 16 middleware)
 supabase/migrations/
   0001_init.sql     tables, indexes, RLS policies, signup trigger
   0002_grants.sql   table privileges for the `authenticated` role
 ```
+
+## Checking for schema drift
+
+```bash
+npm run db:check
+```
+
+Applying migrations by hand means nothing records which ones have run, so the
+database can sit behind the code with no visible symptom until a query fails at
+runtime. This script asks the live database about every table, column, and
+function the app references and exits non-zero if any are missing, naming the
+migration that would create them.
+
+Run it after applying a migration, and before debugging any
+`PGRST202 / 42703 / 42P01` error — those almost always mean an unapplied
+migration rather than a code bug.
+
+It deliberately verifies *objects* rather than keeping a `schema_migrations`
+log. A hand-maintained log has the same failure mode as memory: whoever forgets
+to run the migration also forgets to log it, and you get false confidence.
+Interrogating the database can't drift from reality.
+
+Only the anon key is needed — the script reads no row data, it just separates
+"exists but RLS says no" (401/403) from "doesn't exist" (`PGRST202`,
+`PGRST205`, `42703`).
 
 ## Data model notes
 
@@ -92,6 +119,6 @@ supabase/migrations/
 - [x] 1 — Auth + `users` table + login (email + password, not the magic link
       in SPEC.md — changed deliberately)
 - [ ] 2 — Friend request flow (tables and policies exist; UI pending)
-- [ ] 3 — Link scraping (JSON-LD → Open Graph) + confirm screen
+- [x] 3 — Link scraping (JSON-LD → Open Graph) + confirm screen
 - [ ] 4 — Feed + "I'm interested" toggle
 - [ ] 5 — Visual polish pass across all screens

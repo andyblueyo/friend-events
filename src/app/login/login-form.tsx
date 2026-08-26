@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { Button, Field } from "@/components/ui";
+import { HANDLE_HINT, HANDLE_PATTERN } from "@/lib/handle";
 import { authenticate, type AuthMode, type LoginState } from "./actions";
 
 const INITIAL: LoginState = { status: "idle" };
@@ -100,13 +101,27 @@ export function LoginForm({
         />
 
         {isSignup ? (
-          <Field
-            label="display name"
-            name="display_name"
-            autoComplete="name"
-            required
-            placeholder="how friends know you"
-          />
+          <>
+            <Field
+              label="display name"
+              name="display_name"
+              autoComplete="name"
+              required
+              placeholder="how friends know you"
+            />
+            <Field
+              label="handle"
+              name="handle"
+              autoComplete="username"
+              required
+              pattern={HANDLE_PATTERN}
+              minLength={3}
+              maxLength={20}
+              placeholder="lowercase_handle"
+              className="font-mono"
+              hint={HANDLE_HINT}
+            />
+          </>
         ) : null}
 
         <SubmitButton mode={mode} />

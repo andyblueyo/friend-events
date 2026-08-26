@@ -46,3 +46,13 @@
 @utility border-ink {
   border: 2.5px solid var(--color-ink);
 }
+
+/* Indeterminate dithered progress bar — see SPEC's chrome notes. */
+@keyframes dither-slide {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(310%);
+  }
+}

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { safeNextPath } from "@/lib/safe-redirect";
+import { HANDLE_HINT, isValidHandle } from "@/lib/handle";
 
 export type AuthMode = "signin" | "signup";
 
@@ -73,19 +74,53 @@ export async function authenticate(
     return { status: "error", message: "Pick a display name." };
   }
 
+  const handle = String(formData.get("handle") ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (!isValidHandle(handle)) {
+    return { status: "error", message: `Handle: ${HANDLE_HINT}` };
+  }
+
+  // Checked up front so the common case gets a clean message. The real
+  // guarantee is the UNIQUE constraint, handled below.
+  const { data: available, error: availabilityError } = await supabase.rpc(
+    "handle_available",
+    { candidate: handle },
+  );
+
+  if (availabilityError) {
+    return {
+      status: "error",
+      message: `Couldn't check that handle: ${availabilityError.message}`,
+    };
+  }
+  if (available === false) {
+    return { status: "error", message: `@${handle} is taken.` };
+  }
+
   const origin = await siteOrigin();
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       // Read by the handle_new_user trigger when the auth.users row is created.
-      data: { display_name: displayName },
+      data: { display_name: displayName, handle },
       emailRedirectTo: `${origin}/auth/confirm?next=${encodeURIComponent(next)}`,
     },
   });
 
   if (error) {
-    return { status: "error", message: error.message };
+    // The trigger inserts the profile inside the signup transaction, so a
+    // handle claimed between our check and here surfaces as an opaque
+    // "Database error saving new user" rather than a constraint message.
+    const raced = /database error saving new user/i.test(error.message);
+    return {
+      status: "error",
+      message: raced
+        ? `Couldn't create that account — @${handle} may have just been taken. Try another.`
+        : error.message,
+    };
   }
 
   // Email confirmation off: Supabase returns a session, so we're already in.
