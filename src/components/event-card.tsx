@@ -56,6 +56,43 @@ export function formatEventEndSuffix(
   return sameDay ? `– ${formatTimeOnly(end)}` : `– ${formatEventDate(endIso)}`;
 }
 
+/**
+ * "today" / "tmrw" for the yellow stamp badge, or null to hide it entirely
+ * (past events, events further out, or events with no date). Compares
+ * calendar days rather than a 24h window, and — like formatEventDate — reads
+ * off the *browser's* local clock/timezone, so it needs the same
+ * suppressHydrationWarning treatment at the call site.
+ *
+ * An ongoing multi-day event (start ≤ today ≤ end) still counts as "today";
+ * "tmrw" only applies once "today" no longer matches.
+ */
+export function getUrgencyBadge(
+  startIso: string | null,
+  endIso: string | null,
+): "today" | "tmrw" | null {
+  if (!startIso) return null;
+
+  const start = new Date(startIso);
+  if (Number.isNaN(start.getTime())) return null;
+
+  const parsedEnd = endIso ? new Date(endIso) : null;
+  const end = parsedEnd && !Number.isNaN(parsedEnd.getTime()) ? parsedEnd : start;
+
+  const startOfDay = (d: Date) =>
+    new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+
+  const startDay = startOfDay(start);
+  const endDay = startOfDay(end);
+
+  const now = new Date();
+  const todayDay = startOfDay(now);
+  const tomorrowDay = todayDay + 24 * 60 * 60 * 1000;
+
+  if (startDay <= todayDay && todayDay <= endDay) return "today";
+  if (startDay <= tomorrowDay && tomorrowDay <= endDay) return "tmrw";
+  return null;
+}
+
 const PRICE_LABEL: Record<string, string> = { free: "free", paid: "paid" };
 const RSVP_LABEL: Record<string, string> = {
   registration: "registration",
@@ -83,15 +120,23 @@ export function EventCard({
   onToggled: (next: boolean) => void;
   compact?: boolean;
 }) {
+  const urgency = getUrgencyBadge(event.event_datetime, event.end_datetime);
+
   return (
     <article className="relative">
-      {/* The one signature element on every card, per SPEC.md. */}
-      <span
-        aria-hidden
-        className="border-ink bg-sunflower absolute -top-3 right-4 z-10 rotate-[-5deg] px-2 py-1 font-display text-xs leading-none text-ink"
-      >
-        open to company
-      </span>
+      {/* Signature yellow stamp badge, per SPEC.md — now flags near-term
+          urgency instead of a redundant "open to company" (every event is
+          open to company, so that text carried no signal). Hidden entirely
+          for events that aren't today or tomorrow. */}
+      {urgency ? (
+        <span
+          aria-hidden
+          suppressHydrationWarning
+          className="border-ink bg-sunflower absolute -top-3 right-4 z-10 rotate-[-5deg] px-2 py-1 font-display text-xs leading-none text-ink"
+        >
+          {urgency === "today" ? "today!" : "happening tomorrow"}
+        </span>
+      ) : null}
 
       <div className="border-ink bg-paper shadow-[6px_6px_0_0_var(--color-ink)]">
         <header className="bg-cobalt flex items-center justify-between gap-2 border-b-[2.5px] border-ink px-3 py-1.5">
