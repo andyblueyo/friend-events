@@ -277,7 +277,7 @@ export type Database = {
         Returns: FeedEventRow[];
       };
       fork_event: {
-        Args: { p_event_id: string };
+        Args: { p_event_id: string; p_audience_mode?: AudienceMode };
         Returns: string;
       };
       delete_event: {

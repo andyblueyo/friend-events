@@ -5,6 +5,7 @@ import { useActionState, useEffect, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 
 import { AvatarChip, Button } from "@/components/ui";
+import { AudiencePicker } from "@/components/audience-picker";
 import {
   deleteEvent,
   forkEvent,
@@ -13,7 +14,7 @@ import {
   type ForkState,
   type InterestState,
 } from "@/app/feed-actions";
-import type { FeedEventRow, InterestedFriend } from "@/lib/database.types";
+import type { AudienceMode, FeedEventRow, InterestedFriend } from "@/lib/database.types";
 
 const INITIAL: InterestState = { status: "idle" };
 const DELETE_INITIAL: DeleteState = { status: "idle" };
@@ -513,6 +514,13 @@ function OwnerControls({
  * fork). Available on someone else's fork too (re-forking is allowed), just
  * not on your own posts.
  */
+/**
+ * Sharing (forking) now has the same "who sees this" choice as posting: not
+ * shared yet → "share to my friends" reveals the audience picker before
+ * confirming. Already shared → un-sharing stays a single click, no audience
+ * prompt needed since it's just a delete. Available on someone else's fork
+ * too (re-forking is allowed), just not on your own posts.
+ */
 function ForkButton({
   eventId,
   shared,
@@ -522,27 +530,90 @@ function ForkButton({
   shared: boolean;
   onToggled: (next: boolean) => void;
 }) {
+  const [picking, setPicking] = useState(false);
+  const [audienceMode, setAudienceMode] = useState<AudienceMode>("all");
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+
   const [state, action] = useActionState(
     async (prev: ForkState, formData: FormData) => {
       const result = await forkEvent(prev, formData);
       if (result.status === "idle" && typeof result.shared === "boolean") {
         onToggled(result.shared);
+        setPicking(false);
       }
       return result;
     },
     FORK_INITIAL,
   );
 
+  if (shared) {
+    return (
+      <div className="border-t-[1.5px] border-ink/10 pt-2">
+        <form action={action}>
+          <input type="hidden" name="event_id" value={eventId} />
+          <ForkSubmitButton shared={shared} />
+        </form>
+        {state.status === "error" ? (
+          <p className="mt-1 font-mono text-xs text-poppy">{state.message}</p>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (!picking) {
+    return (
+      <div className="border-t-[1.5px] border-ink/10 pt-2">
+        <Button
+          type="button"
+          variant="plain"
+          className="px-3 py-1.5 text-sm"
+          onClick={() => setPicking(true)}
+        >
+          share to my friends
+        </Button>
+        {state.status === "error" ? (
+          <p className="mt-1 font-mono text-xs text-poppy">{state.message}</p>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
-    <div className="border-t-[1.5px] border-ink/10 pt-2">
-      <form action={action}>
+    <div className="border-t-[1.5px] border-ink/10 space-y-2 pt-2">
+      <form action={action} className="space-y-2">
         <input type="hidden" name="event_id" value={eventId} />
-        <ForkSubmitButton shared={shared} />
+        <AudiencePicker
+          audienceMode={audienceMode}
+          onAudienceModeChange={setAudienceMode}
+          selectedTagIds={selectedTagIds}
+          onSelectedTagIdsChange={setSelectedTagIds}
+        />
+        <div className="flex gap-2">
+          <ConfirmShareButton />
+          <Button
+            type="button"
+            variant="plain"
+            className="px-3 py-1.5 text-sm"
+            onClick={() => setPicking(false)}
+          >
+            cancel
+          </Button>
+        </div>
       </form>
       {state.status === "error" ? (
-        <p className="mt-1 font-mono text-xs text-poppy">{state.message}</p>
+        <p className="font-mono text-xs text-poppy">{state.message}</p>
       ) : null}
     </div>
+  );
+}
+
+function ConfirmShareButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button type="submit" disabled={pending} className="px-3 py-1.5 text-sm">
+      {pending ? "…" : "share"}
+    </Button>
   );
 }
 

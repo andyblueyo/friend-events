@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { parseAudienceTagIds } from "@/lib/event-form";
+import type { AudienceMode } from "@/lib/database.types";
 
 export type DeleteState = {
   status: "idle" | "error";
@@ -99,7 +101,17 @@ export async function forkEvent(
     return { status: "idle", shared: false };
   }
 
-  const { error } = await supabase.rpc("fork_event", { p_event_id: eventId });
+  // "all" is the default whenever the field is missing or unrecognized —
+  // same rule as the plain post flow.
+  const audienceMode: AudienceMode =
+    String(formData.get("audience_mode") ?? "").trim() === "tags"
+      ? "tags"
+      : "all";
+
+  const { data: newEventId, error } = await supabase.rpc("fork_event", {
+    p_event_id: eventId,
+    p_audience_mode: audienceMode,
+  });
 
   if (error) {
     // Another tab/request won the race and already forked it — the end
@@ -109,6 +121,24 @@ export async function forkEvent(
       return { status: "idle", shared: true };
     }
     return { status: "error", message: `Couldn't share that: ${error.message}` };
+  }
+
+  if (audienceMode === "tags" && newEventId) {
+    const tagIds = parseAudienceTagIds(formData);
+    if (tagIds.length > 0) {
+      // event_tags' insert policy re-checks tag ownership server-side, same
+      // as postEvent — a tampered id here just fails to insert rather than
+      // scoping the fork to someone else's tag.
+      const { error: tagError } = await supabase.from("event_tags").insert(
+        tagIds.map((tagId) => ({ event_id: newEventId, tag_id: tagId })),
+      );
+      if (tagError) {
+        return {
+          status: "error",
+          message: `Shared, but couldn't set the audience: ${tagError.message}`,
+        };
+      }
+    }
   }
 
   revalidatePath("/");
