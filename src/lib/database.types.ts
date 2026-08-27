@@ -85,6 +85,17 @@ export type FriendshipListRow = {
   other_avatar_url: string | null;
 };
 
+/**
+ * One person who marked interest in an event, as embedded in
+ * FeedEventRow.interested_friends.
+ */
+export type InterestedFriend = {
+  id: string;
+  display_name: string;
+  handle: string;
+  avatar_url: string | null;
+};
+
 /** Row shape returned by the list_feed_events() RPC. */
 export type FeedEventRow = {
   id: string;
@@ -107,6 +118,13 @@ export type FeedEventRow = {
   interest_count: number;
   is_fork: boolean;
   already_forked_by_me: boolean;
+  /**
+   * The interested users the *viewer* is friends with (plus the viewer
+   * themselves), oldest interest first. jsonb_agg returns null rather than an
+   * empty array, and this can be null even when interest_count > 0 — every
+   * interested user may be a stranger to the viewer.
+   */
+  interested_friends: InterestedFriend[] | null;
 };
 
 export type Database = {

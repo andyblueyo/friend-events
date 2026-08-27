@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState, type ReactNode } from "react";
+import { useActionState, useEffect, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 
 import { AvatarChip, Button } from "@/components/ui";
@@ -13,7 +13,7 @@ import {
   type ForkState,
   type InterestState,
 } from "@/app/feed-actions";
-import type { FeedEventRow } from "@/lib/database.types";
+import type { FeedEventRow, InterestedFriend } from "@/lib/database.types";
 
 const INITIAL: InterestState = { status: "idle" };
 const DELETE_INITIAL: DeleteState = { status: "idle" };
@@ -244,11 +244,11 @@ export function EventCard({
                 />
               )}
 
-              {event.interest_count > 0 ? (
-                <span className="font-mono text-xs text-ink/60">
-                  {event.interest_count} interested
-                </span>
-              ) : null}
+              <InterestedLine
+                friends={event.interested_friends}
+                count={event.interest_count}
+                title={event.title}
+              />
             </div>
 
             <a
@@ -275,6 +275,159 @@ export function EventCard({
         </div>
       </div>
     </article>
+  );
+}
+
+/** How many names get spelled out before the line collapses to "and N more". */
+const NAME_CAP = 3;
+
+/**
+ * "sam", "sam and jess", "sam, jess and marco", "sam, jess, marco and 2 more".
+ * Serial comma is deliberately absent — matches the app's lowercase, informal
+ * voice rather than being an oversight.
+ */
+function formatInterestedNames(names: string[]): string {
+  if (names.length <= NAME_CAP) {
+    if (names.length === 1) return names[0];
+    return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  }
+
+  return `${names.slice(0, NAME_CAP).join(", ")} and ${names.length - NAME_CAP} more`;
+}
+
+/**
+ * Replaces the old bare "{n} interested" with the names of the friends who
+ * marked interest, and opens a popup listing all of them on click.
+ *
+ * Two distinct empty states, both real:
+ *  - count === 0: nobody is interested, render nothing (as before).
+ *  - count > 0 but no visible friends: everyone interested is a stranger to
+ *    this viewer, so fall back to the bare count and *don't* make it a
+ *    trigger — the popup would have nothing to list.
+ */
+function InterestedLine({
+  friends,
+  count,
+  title,
+}: {
+  friends: InterestedFriend[] | null;
+  count: number;
+  title: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (count <= 0) return null;
+
+  const named = friends ?? [];
+
+  if (named.length === 0) {
+    return (
+      <span className="font-mono text-xs text-ink/60">{count} interested</span>
+    );
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        className="font-mono text-left text-xs text-ink/60 underline decoration-dotted underline-offset-2 hover:text-ink"
+      >
+        {formatInterestedNames(named.map((friend) => friend.display_name))}{" "}
+        interested
+      </button>
+
+      {open ? (
+        <InterestedPopup
+          friends={named}
+          title={title}
+          onClose={() => setOpen(false)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Small centered dialog listing every visible interested friend. Fixed
+ * overlay rather than a popover anchored to the trigger: cards render inside
+ * the calendar grid's cells too, where an absolutely-positioned panel would
+ * get clipped or overflow the cell.
+ */
+function InterestedPopup({
+  friends,
+  title,
+  onClose,
+}: {
+  friends: InterestedFriend[];
+  title: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`interested in ${title}`}
+        // The backdrop closes on click, so swallow clicks that land on the
+        // panel itself instead of bubbling up to it.
+        onClick={(event) => event.stopPropagation()}
+        className="border-ink bg-paper w-full max-w-xs shadow-[6px_6px_0_0_var(--color-ink)]"
+      >
+        <header className="bg-cobalt flex items-center justify-between gap-2 border-b-[2.5px] border-ink px-3 py-1.5">
+          <h2 className="min-w-0 truncate font-display text-base leading-none text-white">
+            interested
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="close"
+            className="font-display shrink-0 select-none text-base leading-none tracking-[0.2em] text-white"
+          >
+            x
+          </button>
+        </header>
+
+        <ul className="max-h-72 divide-y-[1.5px] divide-ink/10 overflow-y-auto">
+          {friends.map((friend) => (
+            <li key={friend.id}>
+              <Link
+                href={`/profile/${friend.handle}`}
+                className="flex items-center gap-2 px-3 py-2 hover:bg-grid"
+              >
+                <AvatarChip
+                  name={friend.display_name}
+                  src={friend.avatar_url}
+                  size={28}
+                />
+                <span className="min-w-0">
+                  <span className="block truncate font-display text-sm leading-tight text-ink">
+                    {friend.display_name}
+                  </span>
+                  <span className="block truncate font-mono text-xs text-ink/60">
+                    @{friend.handle}
+                  </span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
   );
 }
 
