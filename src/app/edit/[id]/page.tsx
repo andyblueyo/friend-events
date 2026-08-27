@@ -35,12 +35,24 @@ export default async function EditEventPage({
     notFound();
   }
 
+  const { data: eventTags, error: eventTagsError } = await supabase
+    .from("event_tags")
+    .select("tag_id")
+    .eq("event_id", event.id);
+
+  if (eventTagsError) {
+    throw new Error(`Could not load that event's audience: ${eventTagsError.message}`);
+  }
+
   return (
     <>
       <SiteHeader profile={profile} />
       <main className="mx-auto w-full max-w-2xl flex-1 space-y-4 p-4">
         <Window title="edit your event">
-          <EditFlow event={event} />
+          <EditFlow
+            event={event}
+            initialTagIds={(eventTags ?? []).map((row) => row.tag_id)}
+          />
         </Window>
       </main>
     </>

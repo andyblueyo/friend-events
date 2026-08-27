@@ -25,6 +25,9 @@ const EXPECTED = {
     { name: "friendships", migration: "0001" },
     { name: "events", migration: "0001" },
     { name: "event_interest", migration: "0001" },
+    { name: "tags", migration: "0011" },
+    { name: "tag_members", migration: "0011" },
+    { name: "event_tags", migration: "0011" },
   ],
   columns: [
     { table: "users", column: "handle", migration: "0003" },
@@ -34,6 +37,7 @@ const EXPECTED = {
     { table: "events", column: "notes", migration: "0006" },
     { table: "events", column: "price_type", migration: "0006" },
     { table: "events", column: "rsvp_type", migration: "0006" },
+    { table: "events", column: "audience_mode", migration: "0011" },
   ],
   functions: [
     { name: "friendship_pair", body: { one: ZERO_UUID(), two: ZERO_UUID() }, migration: "0001" },
@@ -42,6 +46,9 @@ const EXPECTED = {
     { name: "search_people", body: { q: "zz" }, migration: "0004" },
     { name: "list_friendships", body: {}, migration: "0004" },
     { name: "list_feed_events", body: {}, migration: "0005" },
+    { name: "can_view_event_audience", body: { viewer: ZERO_UUID(), target_event: ZERO_UUID() }, migration: "0011" },
+    { name: "list_tags", body: {}, migration: "0011" },
+    { name: "set_friend_tags", body: { p_friend_id: ZERO_UUID(), p_tag_ids: [] }, migration: "0011" },
   ],
 };
 

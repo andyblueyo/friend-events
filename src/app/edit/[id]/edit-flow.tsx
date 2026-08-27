@@ -5,8 +5,14 @@ import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { Button, Field, Textarea, ToggleGroup } from "@/components/ui";
+import { AudiencePicker } from "@/components/audience-picker";
 import { deleteEvent, type DeleteState } from "@/app/feed-actions";
-import type { EventRow, PriceType, RsvpType } from "@/lib/database.types";
+import type {
+  AudienceMode,
+  EventRow,
+  PriceType,
+  RsvpType,
+} from "@/lib/database.types";
 import { updateEvent, type EditFieldErrors, type EditState } from "./actions";
 
 const NOTES_MAX_LENGTH = 150;
@@ -44,8 +50,18 @@ function localInputToIso(value: string): string {
   return Number.isNaN(date.getTime()) ? "" : date.toISOString();
 }
 
-export function EditFlow({ event }: { event: EventRow }) {
+export function EditFlow({
+  event,
+  initialTagIds,
+}: {
+  event: EventRow;
+  initialTagIds: string[];
+}) {
   const [state, action] = useActionState(updateEvent, EDIT_INITIAL);
+  const [audienceMode, setAudienceMode] = useState<AudienceMode>(
+    event.audience_mode,
+  );
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>(initialTagIds);
 
   // Controlled on purpose: React resets uncontrolled fields once a form action
   // resolves, which would wipe the user's edits when saving fails.
@@ -223,6 +239,13 @@ export function EditFlow({ event }: { event: EventRow }) {
         onBlur={() => markTouched("source_url")}
         error={errorFor("source_url")}
         hint="Where friends go to actually register."
+      />
+
+      <AudiencePicker
+        audienceMode={audienceMode}
+        onAudienceModeChange={setAudienceMode}
+        selectedTagIds={selectedTagIds}
+        onSelectedTagIdsChange={setSelectedTagIds}
       />
 
       <EditActions canSubmit={canSubmit} />

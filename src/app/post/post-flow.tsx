@@ -4,7 +4,8 @@ import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { Button, Field, ProgressBar, Textarea, ToggleGroup } from "@/components/ui";
-import type { PriceType, RsvpType } from "@/lib/database.types";
+import { AudiencePicker } from "@/components/audience-picker";
+import type { AudienceMode, PriceType, RsvpType } from "@/lib/database.types";
 import type { ScrapeResult } from "@/lib/scrape-event";
 import {
   postEvent,
@@ -113,6 +114,8 @@ function ConfirmForm({
   onRestart: () => void;
 }) {
   const [state, action] = useActionState(postEvent, POST_INITIAL);
+  const [audienceMode, setAudienceMode] = useState<AudienceMode>("all");
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
 
   // Controlled on purpose: React resets uncontrolled fields once a form action
   // resolves, which would wipe the user's edits when posting fails.
@@ -295,6 +298,13 @@ function ConfirmForm({
         onBlur={() => markTouched("source_url")}
         error={errorFor("source_url")}
         hint="Where friends go to actually register."
+      />
+
+      <AudiencePicker
+        audienceMode={audienceMode}
+        onAudienceModeChange={setAudienceMode}
+        selectedTagIds={selectedTagIds}
+        onSelectedTagIdsChange={setSelectedTagIds}
       />
 
       <ConfirmActions onRestart={onRestart} canSubmit={canSubmit} />

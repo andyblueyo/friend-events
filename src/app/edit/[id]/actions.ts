@@ -4,7 +4,11 @@ import { redirect } from "next/navigation";
 
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { parseEventForm, type EventFieldErrors } from "@/lib/event-form";
+import {
+  parseAudienceTagIds,
+  parseEventForm,
+  type EventFieldErrors,
+} from "@/lib/event-form";
 
 export type EditFieldErrors = EventFieldErrors;
 
@@ -54,6 +58,35 @@ export async function updateEvent(
       status: "error",
       message: "Couldn't find that event — it may have been deleted.",
     };
+  }
+
+  // Replace rather than diff: simpler, and event_tags is small per event, so
+  // there's no meaningful cost to clearing and re-inserting on every save.
+  const { error: clearError } = await supabase
+    .from("event_tags")
+    .delete()
+    .eq("event_id", eventId);
+
+  if (clearError) {
+    return {
+      status: "error",
+      message: `Saved, but couldn't update the audience: ${clearError.message}`,
+    };
+  }
+
+  if (parsed.fields.audience_mode === "tags") {
+    const tagIds = parseAudienceTagIds(formData);
+    if (tagIds.length > 0) {
+      const { error: tagError } = await supabase.from("event_tags").insert(
+        tagIds.map((tagId) => ({ event_id: eventId, tag_id: tagId })),
+      );
+      if (tagError) {
+        return {
+          status: "error",
+          message: `Saved, but couldn't update the audience: ${tagError.message}`,
+        };
+      }
+    }
   }
 
   redirect("/");

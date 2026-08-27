@@ -217,6 +217,20 @@ export function EventCard({
             </p>
           ) : null}
 
+          {/* Only ever rendered for the poster's own card (is_mine) — the
+              tag names are private, so audience_tags is always null on
+              anyone else's event regardless of how this card is reached. */}
+          {event.is_mine && event.audience_mode === "tags" ? (
+            <span className="border-ink bg-white inline-block w-fit px-1.5 py-0.5 font-mono text-[10px] leading-none text-ink/75">
+              visible to:{" "}
+              {event.audience_tags && event.audience_tags.length > 0
+                ? event.audience_tags
+                    .map((tag) => `${tag.name} (${tag.member_count})`)
+                    .join(", ")
+                : "nobody yet"}
+            </span>
+          ) : null}
+
           {event.image_url && !compact ? (
             <div className="border-ink bg-white p-1">
               {/* Event images come from arbitrary hosts, so no next/image. */}

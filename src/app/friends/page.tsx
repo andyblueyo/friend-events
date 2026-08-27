@@ -5,21 +5,29 @@ import { Window } from "@/components/window";
 import { AvatarChip } from "@/components/ui";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { FriendshipListRow } from "@/lib/database.types";
+import type { FriendshipListRow, TagListRow } from "@/lib/database.types";
 import { FriendsSearch } from "./friends-search";
 import { IncomingActions, OutgoingActions } from "./request-actions";
+import { FriendsWithTags, TagsManager } from "./tags-panel";
 
 export default async function FriendsPage() {
   const profile = await requireProfile();
 
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("list_friendships");
+  const [{ data, error }, { data: tagData, error: tagError }] = await Promise.all([
+    supabase.rpc("list_friendships"),
+    supabase.rpc("list_tags"),
+  ]);
 
   if (error) {
     throw new Error(`Could not load friendships: ${error.message}`);
   }
+  if (tagError) {
+    throw new Error(`Could not load tags: ${tagError.message}`);
+  }
 
   const rows: FriendshipListRow[] = data ?? [];
+  const tags: TagListRow[] = tagData ?? [];
   const incoming = rows.filter(
     (row) => row.status === "pending" && row.requested_by !== profile.id,
   );
@@ -81,13 +89,11 @@ export default async function FriendsPage() {
               accept.
             </p>
           ) : (
-            <ul className="space-y-2">
-              {friends.map((row) => (
-                <PersonLine key={row.friendship_id} row={row} />
-              ))}
-            </ul>
+            <FriendsWithTags friends={friends} tags={tags} />
           )}
         </Window>
+
+        <TagsManager tags={tags} />
       </main>
     </>
   );

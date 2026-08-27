@@ -4,7 +4,11 @@ import { redirect } from "next/navigation";
 
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { parseEventForm, type EventFieldErrors } from "@/lib/event-form";
+import {
+  parseAudienceTagIds,
+  parseEventForm,
+  type EventFieldErrors,
+} from "@/lib/event-form";
 import { UnsafeUrlError } from "@/lib/safe-fetch";
 import { scrapeEventUrl, type ScrapeResult } from "@/lib/scrape-event";
 
@@ -62,16 +66,38 @@ export async function postEvent(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("events").insert({
-    posted_by: profile.id, // never from the client
-    ...parsed.fields,
-  });
+  const { data: inserted, error } = await supabase
+    .from("events")
+    .insert({
+      posted_by: profile.id, // never from the client
+      ...parsed.fields,
+    })
+    .select("id")
+    .single();
 
   if (error) {
     return {
       status: "error",
       message: `Couldn't post that: ${error.message}`,
     };
+  }
+
+  if (parsed.fields.audience_mode === "tags") {
+    const tagIds = parseAudienceTagIds(formData);
+    if (tagIds.length > 0) {
+      // event_tags' insert policy re-checks that every tag_id is actually
+      // owned by profile.id, so a tampered id here just fails to insert
+      // rather than scoping the event to someone else's tag.
+      const { error: tagError } = await supabase.from("event_tags").insert(
+        tagIds.map((tagId) => ({ event_id: inserted.id, tag_id: tagId })),
+      );
+      if (tagError) {
+        return {
+          status: "error",
+          message: `Posted, but couldn't set the audience: ${tagError.message}`,
+        };
+      }
+    }
   }
 
   // Outside the try/catch above on purpose — redirect() signals by throwing.

@@ -1,4 +1,4 @@
-import type { PriceType, RsvpType } from "@/lib/database.types";
+import type { AudienceMode, PriceType, RsvpType } from "@/lib/database.types";
 import {
   isBlockedIpLiteral,
   parseHttpUrl,
@@ -41,7 +41,21 @@ export type ParsedEventFields = {
   rsvp_type: RsvpType | null;
   image_url: string | null;
   source_url: string;
+  audience_mode: AudienceMode;
 };
+
+/**
+ * Audience tag ids, parsed separately from the rest of the event row since
+ * they go into event_tags, not a column on events. Never trusted as
+ * "these are the poster's own tags" here — the event_tags insert policy
+ * re-checks ownership server-side regardless of what's submitted.
+ */
+export function parseAudienceTagIds(formData: FormData): string[] {
+  return formData
+    .getAll("tag_ids")
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+}
 
 export type ParseEventFormResult =
   | { ok: true; fields: ParsedEventFields }
@@ -80,6 +94,13 @@ export function parseEventForm(formData: FormData): ParseEventFormResult {
   const isoEndDatetime = String(formData.get("end_datetime") ?? "").trim();
   const priceType = parseOptionalEnum(formData.get("price_type"), PRICE_TYPES);
   const rsvpType = parseOptionalEnum(formData.get("rsvp_type"), RSVP_TYPES);
+  // "all" is the default whenever the field is missing or unrecognized —
+  // matches the DB column default and the confirmed "defaults to all
+  // friends" behavior.
+  const audienceMode: AudienceMode =
+    String(formData.get("audience_mode") ?? "").trim() === "tags"
+      ? "tags"
+      : "all";
 
   // Collected rather than returned on the first failure, so the form can
   // highlight every bad field at once instead of one at a time.
@@ -167,6 +188,7 @@ export function parseEventForm(formData: FormData): ParseEventFormResult {
       rsvp_type: rsvpType,
       image_url: imageUrl,
       source_url: sourceUrl as string,
+      audience_mode: audienceMode,
     },
   };
 }

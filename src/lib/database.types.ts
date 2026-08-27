@@ -28,6 +28,8 @@ export type FriendshipRow = {
 export type PriceType = "free" | "paid";
 export type RsvpType = "registration" | "drop_in";
 
+export type AudienceMode = "all" | "tags";
+
 export type EventRow = {
   id: string;
   posted_by: string;
@@ -47,6 +49,27 @@ export type EventRow = {
   forked_from_event_id: string | null;
   root_event_id: string;
   deleted_at: string | null;
+  audience_mode: AudienceMode;
+}
+
+export type TagRow = {
+  id: string;
+  owner_id: string;
+  name: string;
+  created_at: string;
+}
+
+export type TagMemberRow = {
+  id: string;
+  tag_id: string;
+  friend_id: string;
+  created_at: string;
+}
+
+export type EventTagRow = {
+  id: string;
+  event_id: string;
+  tag_id: string;
 }
 
 export type EventInterestRow = {
@@ -96,6 +119,25 @@ export type InterestedFriend = {
   avatar_url: string | null;
 };
 
+/**
+ * One of the poster's own tags an event is scoped to, as embedded in
+ * FeedEventRow.audience_tags. member_count is live (recomputed on every
+ * read), not a snapshot of who saw it at post time.
+ */
+export type AudienceTag = {
+  id: string;
+  name: string;
+  member_count: number;
+};
+
+/** Row shape returned by the list_tags() RPC. */
+export type TagListRow = {
+  tag_id: string;
+  name: string;
+  created_at: string;
+  members: InterestedFriend[];
+};
+
 /** Row shape returned by the list_feed_events() RPC. */
 export type FeedEventRow = {
   id: string;
@@ -125,6 +167,14 @@ export type FeedEventRow = {
    * interested user may be a stranger to the viewer.
    */
   interested_friends: InterestedFriend[] | null;
+  audience_mode: AudienceMode;
+  /**
+   * The poster's own tags this event is scoped to. Only ever populated when
+   * is_mine is true and audience_mode is "tags" — the underlying tag names
+   * are private to the poster, so this must stay null for anyone else's
+   * event even though list_feed_events() is security definer.
+   */
+  audience_tags: AudienceTag[] | null;
 };
 
 export type Database = {
@@ -175,6 +225,30 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      tags: {
+        Row: TagRow;
+        Insert: Omit<TagRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Pick<TagRow, "name">>;
+        Relationships: [];
+      };
+      tag_members: {
+        Row: TagMemberRow;
+        Insert: Omit<TagMemberRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: never;
+        Relationships: [];
+      };
+      event_tags: {
+        Row: EventTagRow;
+        Insert: Omit<EventTagRow, "id"> & { id?: string };
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: Record<never, never>;
     Functions: {
@@ -208,6 +282,18 @@ export type Database = {
       };
       delete_event: {
         Args: { p_event_id: string };
+        Returns: undefined;
+      };
+      can_view_event_audience: {
+        Args: { viewer: string; target_event: string };
+        Returns: boolean;
+      };
+      list_tags: {
+        Args: Record<string, never>;
+        Returns: TagListRow[];
+      };
+      set_friend_tags: {
+        Args: { p_friend_id: string; p_tag_ids: string[] };
         Returns: undefined;
       };
     };
