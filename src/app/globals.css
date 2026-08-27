@@ -21,9 +21,11 @@
   html {
     background-color: var(--color-paper);
     color: var(--color-ink);
+    overflow-x: hidden;
   }
 
   body {
+    overflow-x: hidden;
     font-family: var(--font-sans);
     /* Faint 16px graph-paper grid over warm paper. */
     background-image:

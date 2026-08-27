@@ -154,7 +154,7 @@ export function EventCard({
 
       <div className="border-ink bg-paper shadow-[6px_6px_0_0_var(--color-ink)]">
         <header className="bg-cobalt flex items-center justify-between gap-2 border-b-[2.5px] border-ink px-3 py-1.5">
-          <h2 className="truncate font-display text-base leading-none text-white">
+          <h2 className="min-w-0 truncate font-display text-base leading-none text-white">
             {event.is_fork
               ? `reshared by ${event.poster_display_name}`
               : `${event.poster_display_name} is going`}
@@ -177,7 +177,7 @@ export function EventCard({
               src={event.poster_avatar_url}
               size={28}
             />
-            <span className="truncate font-mono text-xs text-ink/60 hover:underline">
+            <span className="min-w-0 truncate font-mono text-xs text-ink/60 hover:underline">
               @{event.poster_handle}
             </span>
           </Link>

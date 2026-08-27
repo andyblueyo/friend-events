@@ -17,13 +17,13 @@ export function Window({
     <section
       className={`border-ink bg-paper shadow-[6px_6px_0_0_var(--color-ink)] ${className}`}
     >
-      <header className="bg-cobalt flex items-center justify-between border-b-[2.5px] border-ink px-3 py-1.5">
-        <h2 className="font-display text-base leading-none text-white">
+      <header className="bg-cobalt flex items-center justify-between gap-2 border-b-[2.5px] border-ink px-3 py-1.5">
+        <h2 className="min-w-0 truncate font-display text-base leading-none text-white">
           {title}
         </h2>
         <span
           aria-hidden
-          className="font-display select-none text-base leading-none tracking-[0.2em] text-white"
+          className="font-display shrink-0 select-none text-base leading-none tracking-[0.2em] text-white"
         >
           _ □ x
         </span>

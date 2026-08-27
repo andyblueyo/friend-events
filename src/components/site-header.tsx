@@ -7,21 +7,24 @@ import type { UserRow } from "@/lib/database.types";
 export function SiteHeader({ profile }: { profile: UserRow }) {
   return (
     <header className="border-b-[2.5px] border-ink bg-cobalt">
-      <div className="mx-auto flex max-w-2xl items-center justify-between gap-4 px-4 py-2">
-        <Link href="/" className="font-display text-lg text-white">
+      <div className="mx-auto flex max-w-2xl items-center justify-between gap-2 px-3 py-2 sm:gap-4 sm:px-4">
+        <Link
+          href="/"
+          className="min-w-0 truncate font-display text-base text-white sm:text-lg"
+        >
           eventswithfriends
         </Link>
 
-        <nav className="flex items-center gap-3">
+        <nav className="flex shrink-0 items-center gap-2 sm:gap-3">
           <Link
             href="/post"
-            className="font-display text-sm text-white hover:text-sunflower"
+            className="font-display text-xs text-white hover:text-sunflower sm:text-sm"
           >
             post
           </Link>
           <Link
             href="/friends"
-            className="font-display text-sm text-white hover:text-sunflower"
+            className="font-display text-xs text-white hover:text-sunflower sm:text-sm"
           >
             friends
           </Link>
@@ -33,7 +36,7 @@ export function SiteHeader({ profile }: { profile: UserRow }) {
             />
           </Link>
           <form action={signOut}>
-            <Button variant="plain" className="px-2 py-1 text-sm">
+            <Button variant="plain" className="px-1.5 py-1 text-xs sm:px-2 sm:text-sm">
               out
             </Button>
           </form>
