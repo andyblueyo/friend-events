@@ -5,7 +5,7 @@ import type { Database } from "@/lib/database.types";
 import { supabaseEnv } from "./env";
 
 /** Routes reachable while signed out. Everything else redirects to /login. */
-const PUBLIC_PATHS = ["/login", "/auth"];
+const PUBLIC_PATHS = ["/", "/login", "/auth"];
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some(

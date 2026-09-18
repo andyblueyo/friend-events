@@ -1,11 +1,13 @@
 import { SiteHeader } from "@/components/site-header";
-import { requireProfile } from "@/lib/auth";
+import { LandingPage } from "@/components/landing-page";
+import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { FeedEventRow } from "@/lib/database.types";
 import { FeedClient } from "./feed-client";
 
 export default async function FeedPage() {
-  const profile = await requireProfile();
+  const profile = await getCurrentProfile();
+  if (!profile) return <LandingPage />;
 
   const supabase = await createClient();
   // Visibility (own posts + accepted friends' posts) is enforced by the RLS
